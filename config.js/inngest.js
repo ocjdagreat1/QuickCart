@@ -1,4 +1,81 @@
+
 import { Inngest } from "inngest";
+import connectDB from "./db";
+import User from "@/models/User";
+
+export const inngest = new Inngest({ id: "quickcart-next" });
+
+// Helper to safely get email
+const getEmail = (email_addresses) => email_addresses?.[0]?.email_address || null;
+
+// --------------------
+// 1️⃣ Create User
+export const syncUserCreation = inngest.createFunction(
+  { id: "sync-user-from-clerk" },
+  { event: "clerk/user.created" },
+  async ({ event }) => {
+    const { id, first_name, last_name, email_addresses, image_url } = event.data;
+
+    const email = getEmail(email_addresses);
+
+    if (!email) {
+      console.warn("Skipped creating user: email not found", event.data);
+      return; // skip creation if email is missing
+    }
+
+    await connectDB();
+
+    await User.create({
+      _id: id,
+      email,
+      name: `${first_name} ${last_name}`,
+      imageUrl: image_url,
+    });
+  }
+);
+
+// --------------------
+// 2️⃣ Update User
+export const syncUserUpdation = inngest.createFunction(
+  { id: "update-user-from-clerk" },
+  { event: "clerk/user.updated" },
+  async ({ event }) => {
+    const { id, first_name, last_name, email_addresses, image_url } = event.data;
+
+    const email = getEmail(email_addresses);
+    if (!email) {
+      console.warn("Skipped updating user: email not found", event.data);
+      return;
+    }
+
+    await connectDB();
+
+    await User.findByIdAndUpdate(id, {
+      email,
+      name: `${first_name} ${last_name}`,
+      imageUrl: image_url,
+    });
+  }
+);
+
+// --------------------
+// 3️⃣ Delete User
+export const syncUserDeletion = inngest.createFunction(
+  { id: "delete-user-with-clerk" },
+  { event: "clerk/user.deleted" },
+  async ({ event }) => {
+    const { id } = event.data;
+    await connectDB();
+    await User.findByIdAndDelete(id);
+  }
+);
+
+
+
+
+
+
+/*import { Inngest } from "inngest";
 import connectDB from "./db";
 import User from "@/models/User";
 
@@ -56,3 +133,4 @@ async({event}) =>{
   await User.findByIdAndDelete(id)
 }
 )
+*/
