@@ -1,4 +1,4 @@
-
+/*
 import { Inngest } from "inngest";
 import connectDB from "./db";
 import User from "@/models/User";
@@ -69,13 +69,13 @@ export const syncUserDeletion = inngest.createFunction(
     await User.findByIdAndDelete(id);
   }
 );
+*/
 
 
 
 
 
-
-/*import { Inngest } from "inngest";
+import { Inngest } from "inngest";
 import connectDB from "./db";
 import User from "@/models/User";
 
@@ -133,4 +133,3 @@ async({event}) =>{
   await User.findByIdAndDelete(id)
 }
 )
-*/
