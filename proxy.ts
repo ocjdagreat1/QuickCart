@@ -1,6 +1,6 @@
-import { clerkMiddleware } from '@clerk/nextjs/server';
+import { clerkMiddleware } from "@clerk/nextjs/server";
 
-export const middleware = clerkMiddleware();
+export default clerkMiddleware();
 
 export const config = {
   matcher: [
