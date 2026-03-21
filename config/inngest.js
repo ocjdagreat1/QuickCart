@@ -4,84 +4,84 @@ import User from "@/models/User";
 
 export const inngest = new Inngest({ id: "quickcart-next" });
 
-// User Created
+/**
+ * USER CREATED
+ */
 export const syncUserCreation = inngest.createFunction(
-  { id: "sync-user-from-clerk" },
+  {
+    id: "sync-user-from-clerk",
+    retries: 3, // ✅ auto retry if DB fails
+  },
   { event: "clerk/user.created" },
   async ({ event, step }) => {
-    console.log("🚀 User creation function triggered!");
-    console.log("Full event:", JSON.stringify(event, null, 2));
-    
-    try {
-      const user = await step.run("extract-user-data", async () => {
-        const { data } = event;
-        
-        console.log("Event data:", data);
-        
-        const id = data?.id;
-        const email = data?.email_addresses?.[0]?.email_address;
-        const firstName = data?.first_name || "";
-        const lastName = data?.last_name || "";
-        
-        console.log("Extracted:", { id, email, firstName, lastName });
+    console.log("🚀 User creation triggered");
 
-        if (!id) {
-          throw new Error("Missing user ID");
-        }
+    const user = await step.run("extract-user-data", async () => {
+      const { data } = event;
 
-        if (!email) {
-          throw new Error(`Missing email for user ${id}`);
-        }
+      const id = data?.id;
+      const email = data?.email_addresses?.[0]?.email_address;
+      const firstName = data?.first_name || "";
+      const lastName = data?.last_name || "";
 
-        return {
-          clerkId: id,
-          email,
-          name: `${firstName} ${lastName}`.trim() || "User",
-          imageUrl: data?.image_url || "",
-          cartItems: {}
-        };
-      });
+      if (!id) throw new Error("Missing user ID");
+      if (!email) throw new Error(`Missing email for user ${id}`);
 
-      await step.run("save-to-db", async () => {
-        await connectDB();
-        
-        const savedUser = await User.findOneAndUpdate(
-          { clerkId: user.clerkId },
-          user,
-          { upsert: true, new: true }
-        );
-        
-        console.log("✅ User saved to DB:", savedUser);
-        return savedUser;
-      });
+      return {
+        clerkId: id,
+        email,
+        name: `${firstName} ${lastName}`.trim() || "User",
+        imageUrl: data?.image_url || "",
+        cartItems: {},
+      };
+    });
 
-      return { success: true, user };
-    } catch (error) {
-      console.error("❌ Error in user creation:", error);
-      throw error;
-    }
+    await step.run("save-to-db", async () => {
+      await connectDB();
+
+      // ✅ idempotent write (prevents duplicates)
+      const existing = await User.findOne({ clerkId: user.clerkId });
+
+      if (existing) {
+        console.log("ℹ️ User already exists, skipping create");
+        return existing;
+      }
+
+      const newUser = await User.create(user);
+
+      console.log("✅ User created:", newUser);
+      return newUser;
+    });
+
+    return { success: true };
   }
 );
 
-// User Updated
+/**
+ * USER UPDATED
+ */
 export const syncUserUpdation = inngest.createFunction(
-  { id: "update-user-from-clerk" },
+  {
+    id: "update-user-from-clerk",
+    retries: 2,
+  },
   { event: "clerk/user.updated" },
-  async ({ event }) => {
-    console.log("🔄 User update function triggered!");
-    console.log("Update event:", JSON.stringify(event, null, 2));
-    
-    try {
-      const { data } = event;
+  async ({ event, step }) => {
+    console.log("🔄 User update triggered");
+
+    const { data } = event;
+
+    if (!data?.id) {
+      console.log("⚠️ Missing user ID");
+      return { skipped: true };
+    }
+
+    const email = data?.email_addresses?.[0]?.email_address;
+    const name =
+      [data.first_name, data.last_name].filter(Boolean).join(" ") || "User";
+
+    await step.run("update-db", async () => {
       await connectDB();
-
-      const email = data?.email_addresses?.[0]?.email_address;
-      if (!email || !data?.id) {
-        console.log("Missing required data");
-        return { skipped: true };
-      }
-
-      const name = [data.first_name, data.last_name].filter(Boolean).join(" ") || "User";
 
       const updatedUser = await User.findOneAndUpdate(
         { clerkId: data.id },
@@ -94,35 +94,43 @@ export const syncUserUpdation = inngest.createFunction(
       );
 
       console.log("✅ User updated:", updatedUser);
-      return { success: true, user: updatedUser };
-    } catch (error) {
-      console.error("❌ Error in user update:", error);
-      throw error;
-    }
+      return updatedUser;
+    });
+
+    return { success: true };
   }
 );
 
-// User Deleted
+/**
+ * USER DELETED
+ */
 export const syncUserDeletion = inngest.createFunction(
-  { id: "delete-user-with-clerk" },
+  {
+    id: "delete-user-with-clerk",
+    retries: 2,
+  },
   { event: "clerk/user.deleted" },
-  async ({ event }) => {
-    console.log("🗑️ User deletion function triggered!");
-    console.log("Delete event:", JSON.stringify(event, null, 2));
-    
-    if (!event.data?.id) {
-      console.log("Skipped deletion: id missing");
+  async ({ event, step }) => {
+    console.log("🗑️ User deletion triggered");
+
+    const userId = event.data?.id;
+
+    if (!userId) {
+      console.log("⚠️ Missing ID, skipping");
       return { skipped: true };
     }
 
-    try {
+    await step.run("delete-from-db", async () => {
       await connectDB();
-      const deletedUser = await User.findOneAndDelete({ clerkId: event.data.id });
+
+      const deletedUser = await User.findOneAndDelete({
+        clerkId: userId,
+      });
+
       console.log("✅ User deleted:", deletedUser);
-      return { success: true, deleted: !!deletedUser };
-    } catch (error) {
-      console.error("❌ Error in user deletion:", error);
-      throw error;
-    }
+      return deletedUser;
+    });
+
+    return { success: true };
   }
 );
