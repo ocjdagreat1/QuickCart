@@ -1,20 +1,21 @@
 import { Inngest } from "inngest";
 import connectDB from "./db";
 import User from "@/models/User";
+import Order from "@/models/Order";
 
 export const inngest = new Inngest({ id: "quickcart-next" });
 
-/**
- * USER CREATED
- */
+
+  //USER CREATED
+ 
 export const syncUserCreation = inngest.createFunction(
   {
     id: "sync-user-from-clerk",
-    retries: 3, // ✅ auto retry if DB fails
+    retries: 3, 
   },
   { event: "clerk/user.created" },
   async ({ event, step }) => {
-    console.log("🚀 User creation triggered");
+    console.log("User creation triggered");
 
     const user = await step.run("extract-user-data", async () => {
       const { data } = event;
@@ -39,17 +40,17 @@ export const syncUserCreation = inngest.createFunction(
     await step.run("save-to-db", async () => {
       await connectDB();
 
-      // ✅ idempotent write (prevents duplicates)
+      //prevent duplicates
       const existing = await User.findOne({ clerkId: user.clerkId });
 
       if (existing) {
-        console.log("ℹ️ User already exists, skipping create");
+        console.log("User already exists, skipping create");
         return existing;
       }
 
       const newUser = await User.create(user);
 
-      console.log("✅ User created:", newUser);
+      console.log(" User created:", newUser);
       return newUser;
     });
 
@@ -57,9 +58,7 @@ export const syncUserCreation = inngest.createFunction(
   }
 );
 
-/**
- * USER UPDATED
- */
+//USER UPDATED
 export const syncUserUpdation = inngest.createFunction(
   {
     id: "update-user-from-clerk",
@@ -67,12 +66,12 @@ export const syncUserUpdation = inngest.createFunction(
   },
   { event: "clerk/user.updated" },
   async ({ event, step }) => {
-    console.log("🔄 User update triggered");
+    console.log("User update triggered");
 
     const { data } = event;
 
     if (!data?.id) {
-      console.log("⚠️ Missing user ID");
+      console.log("Missing user ID");
       return { skipped: true };
     }
 
@@ -93,7 +92,7 @@ export const syncUserUpdation = inngest.createFunction(
         { new: true, upsert: true }
       );
 
-      console.log("✅ User updated:", updatedUser);
+      console.log("User updated:", updatedUser);
       return updatedUser;
     });
 
@@ -101,9 +100,8 @@ export const syncUserUpdation = inngest.createFunction(
   }
 );
 
-/**
- * USER DELETED
- */
+//USER DELETED
+ 
 export const syncUserDeletion = inngest.createFunction(
   {
     id: "delete-user-with-clerk",
@@ -111,12 +109,12 @@ export const syncUserDeletion = inngest.createFunction(
   },
   { event: "clerk/user.deleted" },
   async ({ event, step }) => {
-    console.log("🗑️ User deletion triggered");
+    console.log("User deletion triggered");
 
     const userId = event.data?.id;
 
     if (!userId) {
-      console.log("⚠️ Missing ID, skipping");
+      console.log(" Missing ID, skipping");
       return { skipped: true };
     }
 
@@ -127,10 +125,40 @@ export const syncUserDeletion = inngest.createFunction(
         clerkId: userId,
       });
 
-      console.log("✅ User deleted:", deletedUser);
+      console.log("User deleted:", deletedUser);
       return deletedUser;
     });
 
     return { success: true };
   }
 );
+
+
+//inngest function to create user's order in database
+
+export const createUserOrder = inngest.createFunction({
+  id:'create-user-order',
+  batchEvents:{
+    maxSize:5,
+    timeout: '5s'
+  }
+},
+  {event:'order/created'},
+  async({events}) =>{
+    const orders = events.map((event)=>{
+      return{
+        userId:event.data.userId,
+        items:event.data.items,
+        amount: event.data.amount,
+        address:event.data.address,
+        date:event.data.date
+      }
+    })
+
+    await connectDB()
+    await Order.insertMany(orders)
+
+    return ({success:true, processed:orders.length});
+
+  }
+)

@@ -9,10 +9,7 @@ const Footer = () => {
         <div className="w-4/5">
           <Image className="w-28 md:w-32" src={assets.logo} alt="logo" />
           <p className="mt-6 text-sm">
-            Lorem Ipsum is simply dummy text of the printing and typesetting
-            industry. Lorem Ipsum has been the industry's standard dummy text
-            ever since the 1500s, when an unknown printer took a galley of type
-            and scrambled it to make a type specimen book.
+            <span className="text-red-500">Q</span>uickcart is your go-to online platform for a seamless shopping experience. We make finding, browsing, and buying products fast, simple, and reliable. Designed with convenience in mind, Quickcart delivers quality, choice, and speed—right at your fingertips.
           </p>
         </div>
 
@@ -47,7 +44,7 @@ const Footer = () => {
         </div>
       </div>
       <p className="py-4 text-center text-xs md:text-sm">
-        Copyright 2025 © OCJDAGREAT1.dev All Right Reserved.
+        Copyright 2026 © OCJDAGREAT1.dev All Right Reserved.
       </p>
     </footer>
   );
