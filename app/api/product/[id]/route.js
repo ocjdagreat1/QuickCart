@@ -48,7 +48,7 @@ export async function DELETE(req, context) {
     }
 
     //  Ownership check
-    if (product.userId !== userId) {
+    if (product.userId.toString() !== userId) {
       return NextResponse.json(
         { success: false, message: "You cannot delete this product" },
         { status: 403 }

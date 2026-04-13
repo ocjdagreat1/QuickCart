@@ -21,7 +21,7 @@ const Product = () => {
     const [productData, setProductData] = useState(null);
 
     const fetchProductData = async () => {
-        const product = products.find(product => product._id === id);
+        const product = products.find(product => product._id.toString() === id);
         setProductData(product);
     }
 
@@ -86,7 +86,7 @@ const Product = () => {
                         {productData.description}
                     </p>
                     <p className="text-3xl font-medium mt-6">
-                        {formatPrice(productData.offerPrice)}
+                        {formatPrice(productData.offerPrice || productData.offerPrice)}
                         <span className="text-base font-normal text-gray-800/60 line-through ml-2">
                         {formatPrice(productData.price)}
                         </span>
